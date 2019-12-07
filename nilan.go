@@ -17,9 +17,9 @@ type Nilan struct {
 
 	CentralHeating *NilanCentralHeating
 	Ventilation    *NilanVentilation
+	HotWater       *service.Thermostat
 
 	OutdoorTemp *service.TemperatureSensor
-	DHWTemp     *service.TemperatureSensor
 	FlowTemp    *service.TemperatureSensor
 }
 
@@ -115,15 +115,30 @@ func NewNilan(info accessory.Info) *Nilan {
 	// 	}
 	// })
 
+	acc.HotWater = service.NewThermostat()
+	acc.HotWater.AddCharacteristic(newName("Hot Water"))
+	acc.HotWater.TargetHeatingCoolingState.SetValue(characteristic.TargetHeatingCoolingStateHeat)
+	acc.HotWater.TargetHeatingCoolingState.Perms = []string{characteristic.PermRead, characteristic.PermEvents}
+	acc.HotWater.TemperatureDisplayUnits.SetValue(characteristic.TemperatureDisplayUnitsCelsius)
+	acc.HotWater.TargetTemperature.SetMinValue(10.0)
+	acc.HotWater.TargetTemperature.SetMaxValue(60.0)
+	acc.HotWater.TargetTemperature.SetStepValue(1.0)
+	acc.HotWater.TargetTemperature.OnValueRemoteUpdate(func(tFloat float64) {
+		log.Printf("Setting new DHW target temperature: %v\n", tFloat)
+		t := int(tFloat * 10.0)
+		if !(t >= 100 && t <= 600) {
+			log.Println("InvalidDHW temperature setting. Ignoring change request.")
+			return
+		}
+		s := nilan.Settings{DesiredDHWTemperature: &t}
+		c := nilanController()
+		c.SendSettings(s)
+	})
+
 	acc.OutdoorTemp = service.NewTemperatureSensor()
 	acc.OutdoorTemp.AddCharacteristic(newName("Outdoor Temperature"))
 	acc.OutdoorTemp.CurrentTemperature.SetMinValue(-40)
 	acc.OutdoorTemp.CurrentTemperature.SetMaxValue(160)
-
-	acc.DHWTemp = service.NewTemperatureSensor()
-	acc.DHWTemp.AddCharacteristic(newName("DHW Temperature"))
-	acc.DHWTemp.CurrentTemperature.SetMinValue(-40)
-	acc.DHWTemp.CurrentTemperature.SetMaxValue(160)
 
 	acc.FlowTemp = service.NewTemperatureSensor()
 	acc.FlowTemp.AddCharacteristic(newName("Flow Temperature"))
@@ -131,10 +146,10 @@ func NewNilan(info accessory.Info) *Nilan {
 	acc.FlowTemp.CurrentTemperature.SetMaxValue(160)
 
 	acc.AddService(acc.CentralHeating.Service)
-	acc.AddService(acc.Ventilation.Service)
-
 	acc.AddService(acc.OutdoorTemp.Service)
-	acc.AddService(acc.DHWTemp.Service)
+	acc.AddService(acc.Ventilation.Service)
+	acc.AddService(acc.HotWater.Service)
+
 	acc.AddService(acc.FlowTemp.Service)
 
 	return &acc
@@ -174,8 +189,15 @@ func updateReadings(acc *Nilan) {
 	}
 	acc.Ventilation.RotationSpeed.SetValue((float64(*s.FanSpeed) - 100) * 25.0)
 
+	acc.HotWater.CurrentTemperature.SetValue(float64(r.DHWTankTopTemperature) / 10.0)
+	acc.HotWater.TargetTemperature.SetValue(float64(*s.DesiredDHWTemperature) / 10.0)
+	if *s.DHWProductionPaused {
+		acc.HotWater.CurrentHeatingCoolingState.SetValue(characteristic.CurrentHeatingCoolingStateOff)
+	} else {
+		acc.HotWater.CurrentHeatingCoolingState.SetValue(characteristic.CurrentHeatingCoolingStateHeat)
+	}
+
 	acc.OutdoorTemp.CurrentTemperature.SetValue(float64(r.OutdoorTemperature) / 10.0)
-	acc.DHWTemp.CurrentTemperature.SetValue(float64(r.DHWTankTopTemperature) / 10.0)
 	acc.FlowTemp.CurrentTemperature.SetValue(float64(r.SupplyFlowTemperature) / 10.0)
 }
 
