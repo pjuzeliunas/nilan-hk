@@ -67,7 +67,7 @@ func NewNilan(info accessory.Info) *Nilan {
 	acc.Accessory = accessory.New(info, accessory.TypeHeater)
 
 	acc.CentralHeatingSwitch = service.NewSwitch()
-	acc.CentralHeatingSwitch.AddCharacteristic(newName("Central Heating Switch"))
+	acc.CentralHeatingSwitch.AddCharacteristic(newName("Central Heating"))
 	acc.CentralHeatingSwitch.On.OnValueRemoteUpdate(func(on bool) {
 		log.Printf("Setting Central Heating active: %v\n", on)
 
@@ -131,7 +131,7 @@ func NewNilan(info accessory.Info) *Nilan {
 	// })
 
 	acc.HotWaterSwitch = service.NewSwitch()
-	acc.HotWaterSwitch.AddCharacteristic(newName("Hot Water Production Switch"))
+	acc.HotWaterSwitch.AddCharacteristic(newName("Hot Water Production"))
 	acc.HotWaterSwitch.On.OnValueRemoteUpdate(func(on bool) {
 		log.Printf("Setting DHW active: %v\n", on)
 
@@ -211,8 +211,8 @@ func newName(n string) *characteristic.Characteristic {
 }
 
 func nilanController() nilan.Controller {
-	conf := nilan.Config{NilanAddress: "192.168.1.31:502"} // TODO: undo
-	// conf := nilan.CurrentConfig()
+	// conf := nilan.Config{NilanAddress: "192.168.1.31:502"} // TODO: undo
+	conf := nilan.CurrentConfig()
 	return nilan.Controller{Config: conf}
 }
 
@@ -278,7 +278,7 @@ func startUpdatingReadings(ac *Nilan, freq time.Duration) {
 
 func main() {
 	// create an accessory
-	info := accessory.Info{Name: "Nilan-Debug"}
+	info := accessory.Info{Name: "Nilan"}
 	ac := NewNilan(info)
 
 	go startUpdatingReadings(ac, 5*time.Second)
