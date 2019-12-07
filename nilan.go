@@ -11,28 +11,51 @@ import (
 	"github.com/pjuzeliunas/nilan"
 )
 
-// Nilan HomeKit accessory
+// Nilan CTS700 accessory
 type Nilan struct {
 	*accessory.Accessory
 
 	CentralHeating *NilanCentralHeating
+	Ventilation    *NilanVentilation
 
 	OutdoorTemp *service.TemperatureSensor
 	DHWTemp     *service.TemperatureSensor
 	FlowTemp    *service.TemperatureSensor
 }
 
+// NilanCentralHeating service
 type NilanCentralHeating struct {
 	*service.Thermostat
 	CurrentRelativeHumidity *characteristic.CurrentRelativeHumidity
 }
 
+// NewNilanCentralHeating instantiates Nilan Central Heating service
 func NewNilanCentralHeating() *NilanCentralHeating {
 	svc := NilanCentralHeating{}
 	svc.Thermostat = service.NewThermostat()
 
 	svc.CurrentRelativeHumidity = characteristic.NewCurrentRelativeHumidity()
 	svc.AddCharacteristic(svc.CurrentRelativeHumidity.Characteristic)
+
+	return &svc
+}
+
+// NilanVentilation service
+type NilanVentilation struct {
+	*service.FanV2
+	RotationSpeed *characteristic.RotationSpeed
+}
+
+// NewNilanVentilation instantiates Nilan Ventilation service
+func NewNilanVentilation() *NilanVentilation {
+	svc := NilanVentilation{}
+	svc.FanV2 = service.NewFanV2()
+
+	svc.RotationSpeed = characteristic.NewRotationSpeed()
+	svc.RotationSpeed.SetMinValue(25)
+	svc.RotationSpeed.SetMaxValue(100)
+	svc.RotationSpeed.SetStepValue(25)
+	svc.AddCharacteristic(svc.RotationSpeed.Characteristic)
 
 	return &svc
 }
@@ -54,10 +77,43 @@ func NewNilan(info accessory.Info) *Nilan {
 	acc.CentralHeating.TargetTemperature.OnValueRemoteUpdate(func(tFloat float64) {
 		log.Printf("Setting new Central Heating target temperature: %v\n", tFloat)
 		t := int(tFloat * 10.0)
+		if !(t >= 50 && t <= 400) {
+			log.Println("Invalid Central Heating temperature setting. Ignoring change request.")
+			return
+		}
 		s := nilan.Settings{DesiredRoomTemperature: &t}
 		c := nilanController()
 		c.SendSettings(s)
 	})
+
+	acc.Ventilation = NewNilanVentilation()
+	acc.Ventilation.AddCharacteristic(newName("Ventilation"))
+	acc.Ventilation.Active.Perms = []string{characteristic.PermRead, characteristic.PermEvents}
+	acc.Ventilation.RotationSpeed.OnValueRemoteUpdate(func(newSpeed float64) {
+		log.Printf("Setting new Ventilation speed: %v\n", newSpeed)
+		speed := nilan.FanSpeed(100 + int(newSpeed)/25)
+		if !(speed >= 101 && speed <= 104) {
+			log.Println("Invalid Ventilation mode. Ignoring change request.")
+			return
+		}
+		s := nilan.Settings{FanSpeed: &speed}
+		c := nilanController()
+		c.SendSettings(s)
+	})
+	// acc.Ventilation.Active.OnValueRemoteUpdate(func(isActive int) {
+	// 	switch isActive {
+	// 	case characteristic.ActiveInactive:
+	// 		p := true
+	// 		s := nilan.Settings{VentilationOnPause: &p}
+	// 		c := nilanController()
+	// 		c.SendSettings(s)
+	// 	case characteristic.ActiveActive:
+	// 		p := false
+	// 		s := nilan.Settings{VentilationOnPause: &p}
+	// 		c := nilanController()
+	// 		c.SendSettings(s)
+	// 	}
+	// })
 
 	acc.OutdoorTemp = service.NewTemperatureSensor()
 	acc.OutdoorTemp.AddCharacteristic(newName("Outdoor Temperature"))
@@ -75,6 +131,8 @@ func NewNilan(info accessory.Info) *Nilan {
 	acc.FlowTemp.CurrentTemperature.SetMaxValue(160)
 
 	acc.AddService(acc.CentralHeating.Service)
+	acc.AddService(acc.Ventilation.Service)
+
 	acc.AddService(acc.OutdoorTemp.Service)
 	acc.AddService(acc.DHWTemp.Service)
 	acc.AddService(acc.FlowTemp.Service)
@@ -109,8 +167,14 @@ func updateReadings(acc *Nilan) {
 	acc.CentralHeating.TargetTemperature.SetValue(float64(*s.DesiredRoomTemperature) / 10.0)
 	acc.CentralHeating.CurrentRelativeHumidity.SetValue(float64(r.ActualHumidity))
 
+	if *s.VentilationOnPause {
+		acc.Ventilation.Active.SetValue(characteristic.ActiveInactive)
+	} else {
+		acc.Ventilation.Active.SetValue(characteristic.ActiveActive)
+	}
+	acc.Ventilation.RotationSpeed.SetValue((float64(*s.FanSpeed) - 100) * 25.0)
+
 	acc.OutdoorTemp.CurrentTemperature.SetValue(float64(r.OutdoorTemperature) / 10.0)
-	acc.Humidity.CurrentRelativeHumidity.SetValue(float64(r.ActualHumidity))
 	acc.DHWTemp.CurrentTemperature.SetValue(float64(r.DHWTankTopTemperature) / 10.0)
 	acc.FlowTemp.CurrentTemperature.SetValue(float64(r.SupplyFlowTemperature) / 10.0)
 }
