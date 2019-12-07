@@ -15,22 +15,24 @@ import (
 type Nilan struct {
 	*accessory.Accessory
 
-	CentralHeating *NilanCentralHeating
-	OutdoorTemp    *service.TemperatureSensor
-	Ventilation    *NilanVentilation
-	HotWater       *service.Thermostat
-	SupplyFlow     *service.Thermostat
+	CentralHeatingSwitch *service.Switch
+	CentralHeating       *NilanCentralHeatingThermostat
+	OutdoorTemp          *service.TemperatureSensor
+	Ventilation          *NilanVentilation
+	HotWaterSwitch       *service.Switch
+	HotWater             *service.Thermostat
+	SupplyFlow           *service.Thermostat
 }
 
-// NilanCentralHeating service
-type NilanCentralHeating struct {
+// NilanCentralHeatingThermostat service
+type NilanCentralHeatingThermostat struct {
 	*service.Thermostat
 	CurrentRelativeHumidity *characteristic.CurrentRelativeHumidity
 }
 
-// NewNilanCentralHeating instantiates Nilan Central Heating service
-func NewNilanCentralHeating() *NilanCentralHeating {
-	svc := NilanCentralHeating{}
+// NewNilanCentralHeatingThermostat instantiates Nilan Central Heating service
+func NewNilanCentralHeatingThermostat() *NilanCentralHeatingThermostat {
+	svc := NilanCentralHeatingThermostat{}
 	svc.Thermostat = service.NewThermostat()
 
 	svc.CurrentRelativeHumidity = characteristic.NewCurrentRelativeHumidity()
@@ -64,7 +66,21 @@ func NewNilan(info accessory.Info) *Nilan {
 	acc := Nilan{}
 	acc.Accessory = accessory.New(info, accessory.TypeHeater)
 
-	acc.CentralHeating = NewNilanCentralHeating()
+	acc.CentralHeatingSwitch = service.NewSwitch()
+	acc.CentralHeatingSwitch.AddCharacteristic(newName("Central Heating Switch"))
+	acc.CentralHeatingSwitch.On.OnValueRemoteUpdate(func(on bool) {
+		log.Printf("Setting Central Heating active: %v\n", on)
+
+		s := nilan.Settings{}
+		s.CentralHeatingIsOn = &on
+		p := !on
+		s.CentralHeatingPaused = &p
+
+		c := nilanController()
+		c.SendSettings(s)
+	})
+
+	acc.CentralHeating = NewNilanCentralHeatingThermostat()
 	acc.CentralHeating.Primary = true
 	acc.CentralHeating.AddCharacteristic(newName("Central Heating"))
 	acc.CentralHeating.TargetHeatingCoolingState.SetValue(characteristic.TargetHeatingCoolingStateHeat)
@@ -114,6 +130,24 @@ func NewNilan(info accessory.Info) *Nilan {
 	// 	}
 	// })
 
+	acc.HotWaterSwitch = service.NewSwitch()
+	acc.HotWaterSwitch.AddCharacteristic(newName("Hot Water Production Switch"))
+	acc.HotWaterSwitch.On.OnValueRemoteUpdate(func(on bool) {
+		log.Printf("Setting DHW active: %v\n", on)
+
+		s := nilan.Settings{}
+		p := !on
+		s.DHWProductionPaused = &p
+
+		if !on {
+			s.DHWProductionPauseDuration = new(int)
+			*s.DHWProductionPauseDuration = 180
+		}
+
+		c := nilanController()
+		c.SendSettings(s)
+	})
+
 	acc.HotWater = service.NewThermostat()
 	acc.HotWater.AddCharacteristic(newName("Hot Water"))
 	acc.HotWater.TargetHeatingCoolingState.SetValue(characteristic.TargetHeatingCoolingStateHeat)
@@ -159,9 +193,11 @@ func NewNilan(info accessory.Info) *Nilan {
 	acc.OutdoorTemp.CurrentTemperature.SetMinValue(-40)
 	acc.OutdoorTemp.CurrentTemperature.SetMaxValue(160)
 
+	acc.AddService(acc.CentralHeatingSwitch.Service)
 	acc.AddService(acc.CentralHeating.Service)
 	acc.AddService(acc.OutdoorTemp.Service)
 	acc.AddService(acc.Ventilation.Service)
+	acc.AddService(acc.HotWaterSwitch.Service)
 	acc.AddService(acc.HotWater.Service)
 	acc.AddService(acc.SupplyFlow.Service)
 
@@ -187,8 +223,10 @@ func updateReadings(acc *Nilan) {
 
 	if *s.CentralHeatingIsOn && !*s.CentralHeatingPaused {
 		acc.CentralHeating.CurrentHeatingCoolingState.SetValue(characteristic.CurrentHeatingCoolingStateHeat)
+		acc.CentralHeatingSwitch.On.SetValue(true)
 	} else {
 		acc.CentralHeating.CurrentHeatingCoolingState.SetValue(characteristic.CurrentHeatingCoolingStateOff)
+		acc.CentralHeatingSwitch.On.SetValue(false)
 	}
 
 	acc.CentralHeating.CurrentTemperature.SetValue(float64(r.RoomTemperature) / 10.0)
@@ -206,8 +244,10 @@ func updateReadings(acc *Nilan) {
 	acc.HotWater.TargetTemperature.SetValue(float64(*s.DesiredDHWTemperature) / 10.0)
 	if *s.DHWProductionPaused {
 		acc.HotWater.CurrentHeatingCoolingState.SetValue(characteristic.CurrentHeatingCoolingStateOff)
+		acc.HotWaterSwitch.On.SetValue(false)
 	} else {
 		acc.HotWater.CurrentHeatingCoolingState.SetValue(characteristic.CurrentHeatingCoolingStateHeat)
+		acc.HotWaterSwitch.On.SetValue(true)
 	}
 
 	acc.SupplyFlow.CurrentTemperature.SetValue(float64(r.SupplyFlowTemperature) / 10.0)
