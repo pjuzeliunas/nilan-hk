@@ -16,11 +16,10 @@ type Nilan struct {
 	*accessory.Accessory
 
 	CentralHeating *NilanCentralHeating
+	OutdoorTemp    *service.TemperatureSensor
 	Ventilation    *NilanVentilation
 	HotWater       *service.Thermostat
-
-	OutdoorTemp *service.TemperatureSensor
-	FlowTemp    *service.TemperatureSensor
+	SupplyFlow     *service.Thermostat
 }
 
 // NilanCentralHeating service
@@ -127,10 +126,30 @@ func NewNilan(info accessory.Info) *Nilan {
 		log.Printf("Setting new DHW target temperature: %v\n", tFloat)
 		t := int(tFloat * 10.0)
 		if !(t >= 100 && t <= 600) {
-			log.Println("InvalidDHW temperature setting. Ignoring change request.")
+			log.Println("Invalid DHW temperature setting. Ignoring change request.")
 			return
 		}
 		s := nilan.Settings{DesiredDHWTemperature: &t}
+		c := nilanController()
+		c.SendSettings(s)
+	})
+
+	acc.SupplyFlow = service.NewThermostat()
+	acc.SupplyFlow.AddCharacteristic(newName("Supply Flow"))
+	acc.SupplyFlow.TargetHeatingCoolingState.SetValue(characteristic.TargetHeatingCoolingStateHeat)
+	acc.SupplyFlow.TargetHeatingCoolingState.Perms = []string{characteristic.PermRead, characteristic.PermEvents}
+	acc.SupplyFlow.TemperatureDisplayUnits.SetValue(characteristic.TemperatureDisplayUnitsCelsius)
+	acc.SupplyFlow.TargetTemperature.SetMinValue(5.0)
+	acc.SupplyFlow.TargetTemperature.SetMaxValue(50.0)
+	acc.SupplyFlow.TargetTemperature.SetStepValue(1.0)
+	acc.SupplyFlow.TargetTemperature.OnValueRemoteUpdate(func(tFloat float64) {
+		log.Printf("Setting new Supply Flow target temperature: %v\n", tFloat)
+		t := int(tFloat * 10.0)
+		if !(t >= 50 && t <= 500) {
+			log.Println("Invalid Supply Flow temperature setting. Ignoring change request.")
+			return
+		}
+		s := nilan.Settings{SetpointSupplyTemperature: &t}
 		c := nilanController()
 		c.SendSettings(s)
 	})
@@ -140,17 +159,11 @@ func NewNilan(info accessory.Info) *Nilan {
 	acc.OutdoorTemp.CurrentTemperature.SetMinValue(-40)
 	acc.OutdoorTemp.CurrentTemperature.SetMaxValue(160)
 
-	acc.FlowTemp = service.NewTemperatureSensor()
-	acc.FlowTemp.AddCharacteristic(newName("Flow Temperature"))
-	acc.FlowTemp.CurrentTemperature.SetMinValue(-40)
-	acc.FlowTemp.CurrentTemperature.SetMaxValue(160)
-
 	acc.AddService(acc.CentralHeating.Service)
 	acc.AddService(acc.OutdoorTemp.Service)
 	acc.AddService(acc.Ventilation.Service)
 	acc.AddService(acc.HotWater.Service)
-
-	acc.AddService(acc.FlowTemp.Service)
+	acc.AddService(acc.SupplyFlow.Service)
 
 	return &acc
 }
@@ -197,8 +210,15 @@ func updateReadings(acc *Nilan) {
 		acc.HotWater.CurrentHeatingCoolingState.SetValue(characteristic.CurrentHeatingCoolingStateHeat)
 	}
 
+	acc.SupplyFlow.CurrentTemperature.SetValue(float64(r.SupplyFlowTemperature) / 10.0)
+	acc.SupplyFlow.TargetTemperature.SetValue(float64(*s.SetpointSupplyTemperature) / 10.0)
+	if *s.CentralHeatingIsOn && !*s.CentralHeatingPaused {
+		acc.SupplyFlow.CurrentHeatingCoolingState.SetValue(characteristic.CurrentHeatingCoolingStateOff)
+	} else {
+		acc.SupplyFlow.CurrentHeatingCoolingState.SetValue(characteristic.CurrentHeatingCoolingStateHeat)
+	}
+
 	acc.OutdoorTemp.CurrentTemperature.SetValue(float64(r.OutdoorTemperature) / 10.0)
-	acc.FlowTemp.CurrentTemperature.SetValue(float64(r.SupplyFlowTemperature) / 10.0)
 }
 
 func startUpdatingReadings(ac *Nilan, freq time.Duration) {
