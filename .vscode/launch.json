@@ -10,7 +10,10 @@
             "request": "launch",
             "mode": "auto",
             "program": "${fileDirname}",
-            "env": {},
+            "env": {
+                "HK_PIN": "00102003",
+                "NILAN_ADDRESS": "192.168.1.31:502"
+            },
             "args": []
         }
     ]

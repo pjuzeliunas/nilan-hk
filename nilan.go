@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"github.com/brutella/hc"
@@ -222,7 +223,6 @@ func newName(n string) *characteristic.Characteristic {
 }
 
 func nilanController() nilan.Controller {
-	// conf := nilan.Config{NilanAddress: "192.168.1.31:502"} // TODO: undo
 	conf := nilan.CurrentConfig()
 	return nilan.Controller{Config: conf}
 }
@@ -306,8 +306,18 @@ func main() {
 
 	go startUpdatingReadings(ac, 5*time.Second)
 
+	pin, pinDefined := os.LookupEnv("HK_PIN")
+	if !pinDefined {
+		log.Panic("HK_PIN environment variable with 8 digit PIN code must be present")
+	}
+	port, portDefined := os.LookupEnv("HK_PORT")
+
 	// configure the ip transport
-	config := hc.Config{Pin: "00102003", Port: "55295"}
+	config := hc.Config{Pin: pin}
+	if portDefined {
+		config.Port = port
+	}
+
 	t, err := hc.NewIPTransport(config, ac.Accessory)
 	if err != nil {
 		log.Panic(err)
