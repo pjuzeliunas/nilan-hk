@@ -253,9 +253,9 @@ func updateReadings(acc *Nilan) {
 	acc.SupplyFlow.CurrentTemperature.SetValue(float64(r.SupplyFlowTemperature) / 10.0)
 	acc.SupplyFlow.TargetTemperature.SetValue(float64(*s.SetpointSupplyTemperature) / 10.0)
 	if *s.CentralHeatingIsOn && !*s.CentralHeatingPaused {
-		acc.SupplyFlow.CurrentHeatingCoolingState.SetValue(characteristic.CurrentHeatingCoolingStateOff)
-	} else {
 		acc.SupplyFlow.CurrentHeatingCoolingState.SetValue(characteristic.CurrentHeatingCoolingStateHeat)
+	} else {
+		acc.SupplyFlow.CurrentHeatingCoolingState.SetValue(characteristic.CurrentHeatingCoolingStateOff)
 	}
 
 	acc.OutdoorTemp.CurrentTemperature.SetValue(float64(r.OutdoorTemperature) / 10.0)
