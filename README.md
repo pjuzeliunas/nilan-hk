@@ -5,11 +5,9 @@ controller from HomeKit-enabled apps, such as Apple Home or Eve.
 
 Software is implemented in Go and is based on [hc](https://github.com/brutella/hc) framework.
 
-![](scr1.png "App")
+Nilan settings in [Eve](https://apps.apple.com/us/app/eve-for-homekit/id917695792) app:
 
 ![](scr2.png "App")
-
-Nilan settings in Eve app
 
 ## Hardware setup
 
@@ -66,7 +64,8 @@ export NILAN_ADDRESS=192.168.1.20:502
   - `NILAN_ADDRESS` (optional): Address and port (default 502) of Nilan heatpump. If variable
 is not provided, accessory software uses factory address of Nilan, which is "192.168.5.107:502".
 
-If various Nilan readings start being logged, then your software is running as it should.
+If various Nilan readings start being logged, then your software is running as it should. You should
+now be able to add the accessory to HomeKit-enabled app.
 
 ## Set `nilan-hk` up as a service
 
@@ -130,8 +129,8 @@ sudo systemctl enable nilan-hk.service
   - Supply Flow thermostat:
     - `TargetHeatingCoolingState` is read-only.
     - According to HAP, `TargetHeatingCoolingState` of thermostat should permit write operation with
-      one 4 possible values: auto, cool, heat, off. Some values are simply not logical in Nilan
-      supply flow settings.
+      one of the 4 possible values: auto, cool, heat or off. Some values are not logical in
+      Nilan supply flow settings, and therefore author decided to disable write access.
   - Hot Water thermostat:
     - `TargetHeatingCoolingState` is read-only.
     - Same reasoning as in supply flow thermostat.
