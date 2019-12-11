@@ -112,10 +112,10 @@ sudo systemctl enable nilan-hk.service
   heating and cooling can be done at the same time. There is no easy way of knowing wether
   Nilan is heating or cooling at the moment, as it can be doing both in parallel.
 - Switching Central Heating off will simply put it to standby mode (aka pause) for 180 days.
-  After 160 days it will turn on automatically. Swithing it back on will resume normal
+  After 180 days it will turn on automatically. Swithing it back on will resume normal
   operation. You can always prolong standby mode by 180 days by turning the switch on and
   off again.
-- Same logic applies for Hot Water Production switch: off means 160 days pause.
+- Same logic applies for Hot Water Production switch: off means 180 days pause.
 
 - Some HAP characteristics of Nilan have non-standard read/write permission attribute, which means
   that UI in some apps (like Apple Home) might appear distorted. The following services are affected by non-standard access permission attribute on some characteristics:
