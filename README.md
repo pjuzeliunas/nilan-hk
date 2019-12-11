@@ -69,7 +69,7 @@ now be able to add the accessory to HomeKit-enabled app.
 
 ## Set `nilan-hk` up as a service
 
-If you want Nilan-HK to be running in the background and start automatically after every reboot,
+If you want Nilan-HK to be running in background and to start automatically after every reboot,
 then you have to make it a service. Steps are for Raspbian OS, but you can use them for inspiration
 on other OS too.
 
@@ -111,9 +111,9 @@ sudo systemctl enable nilan-hk.service
   means normal operation without heating and "auto" means just normal operation, in which
   heating and cooling can be done at the same time. There is no easy way of knowing wether
   Nilan is heating or cooling at the moment, as it can be doing both in parallel.
-- Switching Central Heating off will simply put it to standby mode (aka pause) for 160 days.
+- Switching Central Heating off will simply put it to standby mode (aka pause) for 180 days.
   After 160 days it will turn on automatically. Swithing it back on will resume normal
-  operation. You can always prolong standby mode by 160 days by turning the switch on and
+  operation. You can always prolong standby mode by 180 days by turning the switch on and
   off again.
 - Same logic applies for Hot Water Production switch: off means 160 days pause.
 
@@ -138,6 +138,7 @@ sudo systemctl enable nilan-hk.service
 ## Disclaimer
 
 This initial version of software is developed by home automation enthusiast (outside Nilan company) and
-is based on open Nilan CTS700 Modbus protocol.
+is based on open Nilan
+[CTS700 Modbus protocol](https://www.nilan.dk/Admin/Public/DWSDownload.aspx?File=%2fFiles%2fFiler%2fDownload%2fDanish%2fDokumentation%2fSoftware+vejledninger%2fModbus%2fCTS700_Modbus_protokol.pdf).
 
 Nilan is a registered trademark and belongs to [Nilan A/S](https://www.nilan.dk/).
