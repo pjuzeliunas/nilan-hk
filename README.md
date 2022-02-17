@@ -46,7 +46,7 @@ cd pjuzeliunas/nilan-hk
 
 3. Install dependencies
 ```
-go get -u ./...
+go get all
 ```
 
 4. Build accessory software:
